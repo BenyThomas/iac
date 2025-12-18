@@ -1,0 +1,9 @@
+---
+- name: reload auditd rules
+  ansible.builtin.command: augenrules --load
+  notify: restart auditd
+
+- name: restart auditd
+  ansible.builtin.service:
+    name: auditd
+    state: restarted

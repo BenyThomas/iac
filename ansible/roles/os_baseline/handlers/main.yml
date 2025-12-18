@@ -1,0 +1,10 @@
+---
+- name: restart containerd
+  ansible.builtin.service:
+    name: containerd
+    state: restarted
+
+- name: restart sshd
+  ansible.builtin.service:
+    name: "{{ os_baseline_sshd_service }}"
+    state: restarted

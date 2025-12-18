@@ -1,0 +1,130 @@
+---
+- name: Disable swap at runtime
+  ansible.builtin.command: swapoff -a
+  when:
+    - os_baseline_disable_swap
+    - ansible_swaptotal_mb | default(0) | int > 0
+  changed_when: true
+
+- name: Comment swap entries in /etc/fstab
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s.*)$'
+    replace: '# \1'
+  when: os_baseline_disable_swap
+
+- name: Ensure Kubernetes kernel modules are configured to load
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      {% for module in os_baseline_kernel_modules %}{{ module }}
+      {% endfor %}
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Load required kernel modules
+  ansible.builtin.command: "modprobe {{ item }}"
+  loop: "{{ os_baseline_kernel_modules }}"
+  changed_when: false
+
+- name: Apply Kubernetes sysctl settings
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_set: true
+    reload: true
+  loop: "{{ os_baseline_sysctl_settings | dict2items }}"
+
+- name: Install time synchronization service
+  ansible.builtin.package:
+    name: "{{ os_baseline_time_sync_package }}"
+    state: present
+
+- name: Enable and start time synchronization
+  ansible.builtin.service:
+    name: "{{ os_baseline_time_sync_service }}"
+    state: started
+    enabled: true
+
+- name: Install container runtime
+  ansible.builtin.package:
+    name: "{{ os_baseline_containerd_package }}"
+    state: present
+
+- name: Ensure containerd configuration directory exists
+  ansible.builtin.file:
+    path: "{{ os_baseline_containerd_config_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Configure containerd
+  ansible.builtin.template:
+    src: containerd-config.toml.j2
+    dest: "{{ os_baseline_containerd_config_path }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart containerd
+
+- name: Enable and start containerd
+  ansible.builtin.service:
+    name: containerd
+    state: started
+    enabled: true
+
+- name: Ensure platform admins group exists
+  ansible.builtin.group:
+    name: "{{ os_baseline_admin_group }}"
+    state: present
+
+- name: Configure admin users
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    uid: "{{ item.uid | default(omit) }}"
+    groups: "{{ os_baseline_admin_group }}"
+    append: true
+    shell: "{{ item.shell | default('/bin/bash') }}"
+    state: present
+  loop: "{{ os_baseline_admin_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Configure admin user SSH keys
+  ansible.builtin.authorized_key:
+    user: "{{ item.0.name }}"
+    key: "{{ item.1 }}"
+  loop: "{{ os_baseline_admin_users | subelements('ssh_keys', skip_missing=True) }}"
+  loop_control:
+    label: "{{ item.0.name }}"
+
+- name: Allow admin group passwordless sudo
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/platform-admins
+    content: "%{{ os_baseline_admin_group }} ALL=(ALL) NOPASSWD:ALL\n"
+    owner: root
+    group: root
+    mode: '0440'
+    validate: 'visudo -cf %s'
+
+- name: Harden SSH daemon configuration
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^{{ item.key }}'
+    line: "{{ item.key }} {{ item.value }}"
+    state: present
+    create: yes
+  loop: "{{ os_baseline_ssh_settings | dict2items }}"
+  notify: restart sshd
+
+- name: Ensure SSH listens on required port
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^Port'
+    line: "Port {{ os_baseline_sshd_port }}"
+    state: present
+    create: yes
+  notify: restart sshd
