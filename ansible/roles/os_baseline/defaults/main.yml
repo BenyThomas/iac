@@ -1,0 +1,40 @@
+---
+os_baseline_disable_swap: true
+
+os_baseline_kernel_modules:
+  - overlay
+  - br_netfilter
+
+os_baseline_sysctl_settings:
+  net.bridge.bridge-nf-call-iptables: 1
+  net.bridge.bridge-nf-call-ip6tables: 1
+  net.ipv4.ip_forward: 1
+
+os_baseline_time_sync_package: chrony
+os_baseline_time_sync_service: "{{ 'chronyd' if ansible_os_family == 'RedHat' else 'chrony' }}"
+
+os_baseline_containerd_package: containerd
+os_baseline_containerd_config_path: /etc/containerd/config.toml
+os_baseline_containerd_systemd_cgroup: true
+
+os_baseline_admin_group: platform-admins
+os_baseline_admin_users: []
+# Example:
+# os_baseline_admin_users:
+#   - name: kubeadmin
+#     uid: 1001
+#     shell: /bin/bash
+#     ssh_keys:
+#       - "ssh-ed25519 AAAA... user@example"
+#     sudo: true
+
+os_baseline_sshd_port: 22
+os_baseline_sshd_service: "{{ 'sshd' if ansible_os_family == 'RedHat' else 'ssh' }}"
+os_baseline_ssh_settings:
+  PermitRootLogin: 'no'
+  PasswordAuthentication: 'no'
+  ChallengeResponseAuthentication: 'no'
+  UseDNS: 'no'
+  X11Forwarding: 'no'
+  ClientAliveInterval: 300
+  ClientAliveCountMax: 2

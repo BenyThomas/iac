@@ -1,0 +1,21 @@
+---
+security_hardening_auditd_package: "{{ 'audit' if ansible_os_family == 'RedHat' else 'auditd' }}"
+security_hardening_audit_rules_path: /etc/audit/rules.d/hardening.rules
+
+security_hardening_firewall_provider: "{{ 'firewalld' if ansible_os_family == 'RedHat' else 'ufw' }}"
+security_hardening_allowed_ports:
+  - 22/tcp
+  - 6443/tcp
+  - 2379-2380/tcp
+  - 10250/tcp
+
+security_hardening_legacy_services:
+  - avahi-daemon
+  - cups
+  - telnet.socket
+  - tftp.socket
+  - vsftpd
+  - rsh.socket
+
+security_hardening_enable_patch_automation: true
+security_hardening_patch_package: "{{ 'dnf-automatic' if ansible_os_family == 'RedHat' else 'unattended-upgrades' }}"

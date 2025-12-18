@@ -1,0 +1,9 @@
+---
+- name: Apply OS baseline and security hardening
+  hosts: all
+  become: true
+  vars:
+    os_baseline_admin_users: []
+  roles:
+    - role: os_baseline
+    - role: security_hardening

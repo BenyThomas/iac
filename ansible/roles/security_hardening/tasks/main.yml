@@ -1,0 +1,124 @@
+---
+- name: Install auditd
+  ansible.builtin.package:
+    name: "{{ security_hardening_auditd_package }}"
+    state: present
+
+- name: Deploy audit rules
+  ansible.builtin.template:
+    src: audit.rules.j2
+    dest: "{{ security_hardening_audit_rules_path }}"
+    owner: root
+    group: root
+    mode: '0640'
+  notify: reload auditd rules
+
+- name: Ensure auditd service is enabled
+  ansible.builtin.service:
+    name: auditd
+    state: started
+    enabled: true
+
+- name: Disable legacy or insecure services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+    masked: true
+  loop: "{{ security_hardening_legacy_services }}"
+  when: ansible_service_mgr == 'systemd'
+
+- name: Configure firewalld baseline
+  when: security_hardening_firewall_provider == 'firewalld'
+  block:
+    - name: Ensure firewalld is installed
+      ansible.builtin.package:
+        name: firewalld
+        state: present
+
+    - name: Ensure firewalld is enabled
+      ansible.builtin.service:
+        name: firewalld
+        state: started
+        enabled: true
+
+    - name: Check firewalld default zone
+      ansible.builtin.command: firewall-cmd --get-default-zone
+      register: firewalld_current_zone
+      changed_when: false
+
+    - name: Set firewalld to drop by default
+      ansible.builtin.command: firewall-cmd --set-default-zone=drop
+      when: firewalld_current_zone.stdout.strip() != 'drop'
+
+    - name: Allow required ports via firewalld
+      ansible.posix.firewalld:
+        port: "{{ item }}"
+        permanent: true
+        immediate: true
+        state: enabled
+        zone: drop
+      loop: "{{ security_hardening_allowed_ports }}"
+
+- name: Configure ufw baseline
+  when: security_hardening_firewall_provider == 'ufw'
+  block:
+    - name: Ensure ufw is installed
+      ansible.builtin.package:
+        name: ufw
+        state: present
+
+    - name: Set ufw default incoming policy to deny
+      ansible.builtin.command: ufw default deny incoming
+      register: ufw_default_deny
+      changed_when: "'resetting' in ufw_default_deny.stdout or 'Default incoming' in ufw_default_deny.stdout"
+      failed_when: ufw_default_deny.rc not in [0,1]
+
+    - name: Allow required ports via ufw
+      ansible.builtin.command: ufw allow {{ item }}
+      register: ufw_allow
+      changed_when: "'added' in ufw_allow.stdout.lower()"
+      failed_when: ufw_allow.rc not in [0,1]
+      loop: "{{ security_hardening_allowed_ports }}"
+
+    - name: Enable ufw
+      ansible.builtin.command: ufw --force enable
+      register: ufw_enable
+      changed_when: "'firewall is active' not in ufw_enable.stdout.lower()"
+      failed_when: ufw_enable.rc not in [0,1]
+
+- name: Configure automated patching
+  when: security_hardening_enable_patch_automation
+  block:
+    - name: Install patch automation package
+      ansible.builtin.package:
+        name: "{{ security_hardening_patch_package }}"
+        state: present
+
+    - name: Enable automatic updates (RedHat family)
+      ansible.builtin.service:
+        name: dnf-automatic.timer
+        state: started
+        enabled: true
+      when:
+        - ansible_os_family == 'RedHat'
+
+    - name: Configure unattended-upgrades (Debian family)
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/51auto-upgrades
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
+        owner: root
+        group: root
+        mode: '0644'
+      when:
+        - ansible_os_family == 'Debian'
+
+    - name: Ensure unattended-upgrades service is enabled (Debian family)
+      ansible.builtin.service:
+        name: unattended-upgrades
+        state: started
+        enabled: true
+      when:
+        - ansible_os_family == 'Debian'
