@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-jenkins
+  namespace: argocd
+spec:
+  destination:
+    namespace: jenkins
+    server: https://kubernetes.default.svc
+  project: platform
+  source:
+    repoURL: https://github.com/example/onprem-platform.git
+    path: platform/jenkins/manifests
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

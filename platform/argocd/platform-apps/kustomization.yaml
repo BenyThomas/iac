@@ -6,3 +6,4 @@ resources:
   - applications/pki.yaml
   - applications/identity.yaml
   - applications/harbor.yaml
+  - applications/jenkins.yaml

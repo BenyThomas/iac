@@ -1,24 +1,28 @@
 # Pipelines
 
-Jenkins pipeline template that builds, scans, signs, and publishes container images into Harbor with supply chain controls.
+Jenkins pipeline template that runs on Kubernetes dynamic agents. The template delivers a full CI/CD supply chain: build, test, package, image build/push, GitOps update, and layered security checks (SAST, SCA, secrets, container, IaC, and DAST).
 
 ## Template highlights
-- Pull base images via Harbor proxy cache projects (`dockerhub-proxy`, `ghcr-proxy`, `quay-proxy`).
-- Use project-specific robot accounts stored as Jenkins credentials (`harbor-robot-dev|uat|prod`).
-- Apply environment-aware Trivy severity gates and emit Cosign signatures + vulnerability attestations.
-- Keep secrets out of logs via `withCredentials` and masked environment variables.
+- Uses the Jenkins Kubernetes plugin with a pod template that supplies build tools, Kaniko, Trivy, Semgrep, Gitleaks, Cosign, and OWASP ZAP. Resource requests/limits and `workload=ci` node selectors keep agents elastic but constrained.
+- Pulls and publishes images via Harbor proxy caches (`dockerhub-proxy`, `ghcr-proxy`, `quay-proxy`) using environment-aware robot credentials.
+- Enforces severity thresholds per environment for container and IaC scans, blocks secrets in source, and fails on SAST/SCA findings.
+- Signs and attests images with Cosign and performs an admission dry run against the in-cluster public key.
+- Optional DAST stage runs OWASP ZAP against a provided URL and archives reports for export.
 
 ## Usage
 1. Copy `Jenkinsfile.template` into your repo as `Jenkinsfile`.
-2. Create Jenkins credentials:
+2. Define Jenkins credentials:
    - `harbor-robot-<env>`: username/password for Harbor robot accounts.
-   - `cosign-key`: secret text containing the Cosign private key (or set up keyless and remove the key reference).
+   - `cosign-key`: secret text containing the Cosign private key (or enable keyless and adjust the `Sign & Attest` stage).
+   - `SECURITY_REPORT_WEBHOOK` (optional): secret text or string parameter for exporting ZAP results.
 3. Set pipeline parameters or environment variables:
    - `DEPLOY_ENV` (`dev|uat|prod`) — drives Harbor project selection and severity gates.
-   - `IMAGE_NAME` — application image name (defaults to repository name).
-4. Ensure the Jenkins agent has Docker/Podman, Trivy, Cosign, and access to Harbor (ingress VIP or internal DNS).
+   - `IMAGE_NAME` — image name override (defaults to repository name).
+   - `DAST_TARGET_URL` — target endpoint for the ZAP baseline scan (leave empty to skip DAST).
+4. Ensure the Kubernetes cluster has nodes labeled `workload=ci` (for agents) and `workload=platform` (for the controller), plus network access from agents to Harbor and the DAST target.
 
 ## Security notes
-- Robot tokens are only loaded into the `Publish` stage and not echoed to logs.
-- Cosign public key must be distributed to the cluster (`platform-services/cosign-public-key`) for admission verification.
-- Vulnerability attestation thresholds should mirror the Kyverno policy in `policies/supply-chain/vuln-attestation-thresholds.yaml`.
+- Secret scanning (Gitleaks) fails the pipeline on leaked credentials before any artifact leaves the cluster.
+- Semgrep SAST and Trivy SCA/IaC scans emit JSON reports into `reports/` and fail on findings that cross the configured severities.
+- Container images are scanned with Trivy using per-environment gates, then signed and attested with Cosign. Verify policies with `cosign verify --key k8s://configmap/cosign-public-key/key`.
+- ZAP baseline results are archived and optionally POSTed to an external reporting system via `SECURITY_REPORT_WEBHOOK`.
