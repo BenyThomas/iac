@@ -1,0 +1,25 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: vsphere-fast
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: csi.vsphere.vmware.com
+allowVolumeExpansion: true
+parameters:
+  storagePolicyName: "vsan-perf"
+  csi.storage.k8s.io/fstype: "ext4"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: vsphere-standard
+provisioner: csi.vsphere.vmware.com
+allowVolumeExpansion: true
+parameters:
+  storagePolicyName: "vsan-default"
+  csi.storage.k8s.io/fstype: "ext4"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
