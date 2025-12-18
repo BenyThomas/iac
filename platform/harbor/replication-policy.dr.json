@@ -1,0 +1,17 @@
+{
+  "name": "prod-to-dr",
+  "description": "Replicate prod artifacts to DR Harbor/registry",
+  "src_registry": { "id": 0 },
+  "dest_registry": { "id": 2 },
+  "dest_namespace": "prod",
+  "trigger": {
+    "type": "scheduled",
+    "trigger_settings": { "cron": "0 */4 * * *" }
+  },
+  "filters": [
+    { "type": "name", "value": "prod/**" }
+  ],
+  "override": true,
+  "replicate_deletion": true,
+  "enabled": true
+}
