@@ -5,6 +5,7 @@ This repo is the source of truth for on‑prem platform infrastructure and Kuber
 ## Structure
 - terraform/
 - ansible/
+- docs/
 - clusters/
 - platform/
 - policies/
