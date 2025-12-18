@@ -1,108 +1,391 @@
 pipeline {
-  agent any
+  agent {
+    kubernetes {
+      label "k8s-jenkins"
+      defaultContainer 'tools'
+      yaml """
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    jenkins/role: ci
+spec:
+  serviceAccountName: jenkins
+  restartPolicy: Never
+  nodeSelector:
+    workload: ci
+  tolerations:
+    - key: workload
+      operator: Equal
+      value: ci
+      effect: NoSchedule
+  volumes:
+    - name: docker-config
+      emptyDir: {}
+    - name: workspace
+      emptyDir: {}
+  containers:
+    - name: jnlp
+      image: jenkins/inbound-agent:3256.v88fa_3348920d-5
+      args:
+        - \$(JENKINS_SECRET)
+        - \$(JENKINS_NAME)
+      env:
+        - name: JENKINS_URL
+          value: http://jenkins.jenkins.svc.cluster.local:8080
+        - name: JENKINS_PROTOCOLS
+          value: JNLP4-plain
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "256Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+      volumeMounts:
+        - name: workspace
+          mountPath: /home/jenkins/agent
+    - name: tools
+      image: mcr.microsoft.com/devcontainers/base:bookworm
+      command: ['bash', '-c', 'cat']
+      tty: true
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "2"
+          memory: "4Gi"
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:v1.23.2
+      args: ['--help']
+      env:
+        - name: DOCKER_CONFIG
+          value: /kaniko/.docker
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+        - name: docker-config
+          mountPath: /kaniko/.docker
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "2"
+          memory: "2Gi"
+    - name: trivy
+      image: aquasec/trivy:0.50.1
+      command: ['sh', '-c', 'sleep 3600']
+      tty: true
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "512Mi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+    - name: semgrep
+      image: returntocorp/semgrep:1.66.0
+      command: ['sh', '-c', 'sleep 3600']
+      tty: true
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "512Mi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+    - name: gitleaks
+      image: zricethezav/gitleaks:8.18.4
+      command: ['sh', '-c', 'sleep 3600']
+      tty: true
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "256Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+    - name: zap
+      image: owasp/zap2docker-stable
+      command: ['sh', '-c', 'sleep 3600']
+      tty: true
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "1"
+          memory: "2Gi"
+    - name: cosign
+      image: cgr.dev/chainguard/cosign:latest
+      command: ['sh', '-c', 'sleep 3600']
+      tty: true
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "256Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+"""
+    }
+  }
   parameters {
     choice(name: 'DEPLOY_ENV', choices: ['dev', 'uat', 'prod'], description: 'Target Harbor project/environment')
+    string(name: 'IMAGE_NAME', defaultValue: '', description: 'Override image name (defaults to repo name)')
+    string(name: 'DAST_TARGET_URL', defaultValue: '', description: 'URL for OWASP ZAP to scan (leave blank to skip)')
   }
   options {
     timestamps()
+    disableConcurrentBuilds()
   }
   environment {
     HARBOR_HOST = "harbor.registry.example.com"
-    IMAGE_NAME = "sample-app"
     BASE_IMAGE = "${HARBOR_HOST}/dockerhub-proxy/library/alpine:3.19"
     COSIGN_ATTESTATION_TYPE = "https://cosign.sigstore.dev/attestation/vuln/v1"
+    SCA_SEVERITY = "CRITICAL,HIGH"
+    IAC_SEVERITY = "CRITICAL,HIGH"
   }
   stages {
     stage('Init') {
       steps {
-        script {
-          env.DEPLOY_ENV = params.DEPLOY_ENV ?: 'dev'
-          env.HARBOR_PROJECT = env.DEPLOY_ENV
-          env.IMAGE_NAME = env.IMAGE_NAME ?: env.JOB_BASE_NAME
-          env.IMAGE_TAG = "build-${env.BUILD_NUMBER}"
-          env.IMAGE_REF = "${env.HARBOR_HOST}/${env.HARBOR_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-          env.TRIVY_SEVERITY = [dev: "CRITICAL", uat: "CRITICAL,HIGH", prod: "CRITICAL,HIGH,MEDIUM"][env.DEPLOY_ENV]
+        container('tools') {
+          script {
+            env.DEPLOY_ENV = params.DEPLOY_ENV ?: 'dev'
+            env.HARBOR_PROJECT = env.DEPLOY_ENV
+            env.IMAGE_NAME = params.IMAGE_NAME?.trim() ? params.IMAGE_NAME : (env.IMAGE_NAME ?: env.JOB_BASE_NAME)
+            env.IMAGE_TAG = "build-${env.BUILD_NUMBER}"
+            env.IMAGE_REF = "${env.HARBOR_HOST}/${env.HARBOR_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+            env.TRIVY_SEVERITY = [dev: "CRITICAL", uat: "CRITICAL,HIGH", prod: "CRITICAL,HIGH,MEDIUM"][env.DEPLOY_ENV]
+            env.DAST_TARGET_URL = params.DAST_TARGET_URL ?: ''
+          }
+          sh 'mkdir -p reports'
         }
       }
     }
-    stage('Checkout') { steps { checkout scm } }
+    stage('Checkout') {
+      steps {
+        container('tools') { checkout scm }
+      }
+    }
+    stage('Secret Scan (Gitleaks)') {
+      steps {
+        container('gitleaks') {
+          sh '''
+            set -euo pipefail
+            cd ${WORKSPACE}
+            gitleaks detect --source . --report-path reports/gitleaks.json --exit-code 1
+          '''
+        }
+      }
+    }
+    stage('SAST (Semgrep)') {
+      steps {
+        container('semgrep') {
+          sh '''
+            set -euo pipefail
+            cd ${WORKSPACE}
+            semgrep scan --config auto --error --json --output reports/semgrep.json
+          '''
+        }
+      }
+    }
+    stage('SCA (Trivy FS)') {
+      steps {
+        container('trivy') {
+          sh '''
+            set -euo pipefail
+            cd ${WORKSPACE}
+            trivy fs --scanners vuln --severity ${SCA_SEVERITY} --exit-code 1 --format json -o reports/trivy-sca.json .
+          '''
+        }
+      }
+    }
+    stage('IaC Scan (Trivy Config)') {
+      steps {
+        container('trivy') {
+          sh '''
+            set -euo pipefail
+            cd ${WORKSPACE}
+            trivy config --severity ${IAC_SEVERITY} --exit-code 1 --format json -o reports/trivy-iac.json --file-patterns "*.tf,*.yaml,*.yml" .
+          '''
+        }
+      }
+    }
     stage('Build') {
       steps {
-        sh '''
-          set -euo pipefail
-          docker build --build-arg BASE_IMAGE=${BASE_IMAGE} -t ${IMAGE_REF} .
-        '''
+        container('tools') {
+          sh '''
+            set -euo pipefail
+            cd ${WORKSPACE}
+            if command -v mvn >/dev/null 2>&1 && [ -f pom.xml ]; then
+              mvn -B verify
+            elif command -v ./gradlew >/dev/null 2>&1 && ls build.gradle* >/dev/null 2>&1; then
+              ./gradlew build
+            elif command -v npm >/dev/null 2>&1 && [ -f package.json ]; then
+              npm ci
+            else
+              echo "No build system detected; skipping compile step"
+            fi
+          '''
+        }
       }
     }
     stage('Test') {
       steps {
-        sh '''
-          set -euo pipefail
-          ./gradlew test || true
-        '''
+        container('tools') {
+          sh '''
+            set -euo pipefail
+            cd ${WORKSPACE}
+            if command -v mvn >/dev/null 2>&1 && [ -f pom.xml ]; then
+              mvn -B test
+            elif command -v ./gradlew >/dev/null 2>&1 && ls build.gradle* >/dev/null 2>&1; then
+              ./gradlew test
+            elif command -v npm >/dev/null 2>&1 && [ -f package.json ]; then
+              npm test -- --watch=false
+            else
+              echo "No automated tests detected; skipping"
+            fi
+          '''
+        }
       }
     }
-    stage('Scan') {
+    stage('Package') {
       steps {
-        sh '''
-          set -euo pipefail
-          trivy image --severity ${TRIVY_SEVERITY} --exit-code 1 --ignore-unfixed=false --format json -o trivy.json ${IMAGE_REF}
-        '''
+        container('tools') {
+          sh '''
+            set -euo pipefail
+            cd ${WORKSPACE}
+            if command -v mvn >/dev/null 2>&1 && [ -f pom.xml ]; then
+              mvn -B package
+            elif command -v ./gradlew >/dev/null 2>&1 && ls build.gradle* >/dev/null 2>&1; then
+              ./gradlew assemble
+            elif command -v npm >/dev/null 2>&1 && [ -f package.json ]; then
+              npm pack
+            else
+              echo "No packaging step configured; add your artifact packaging here"
+            fi
+          '''
+        }
       }
     }
-    stage('Publish') {
+    stage('Image Build & Push (Kaniko)') {
       steps {
         withCredentials([usernamePassword(credentialsId: "harbor-robot-${DEPLOY_ENV}", usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASSWORD')]) {
-          sh '''
-            set -euo pipefail
-            echo "${HARBOR_PASSWORD}" | docker login ${HARBOR_HOST} -u "${HARBOR_USER}" --password-stdin
-            docker push ${IMAGE_REF}
-            docker logout ${HARBOR_HOST}
-          '''
+          container('kaniko') {
+            sh '''
+              set -euo pipefail
+              cd ${WORKSPACE}
+              mkdir -p /kaniko/.docker
+              cat > /kaniko/.docker/config.json <<'CONFIG_JSON'
+              {
+                "auths": {
+                  "${HARBOR_HOST}": {"username": "${HARBOR_USER}", "password": "${HARBOR_PASSWORD}"}
+                }
+              }
+CONFIG_JSON
+              /kaniko/executor --context ${WORKSPACE} --dockerfile ${WORKSPACE}/Dockerfile --destination ${IMAGE_REF} --verbosity info
+            '''
+          }
         }
       }
     }
-    stage('Sign') {
+    stage('Container Scan (Trivy Image)') {
       steps {
-        withCredentials([string(credentialsId: 'cosign-key', variable: 'COSIGN_PRIVATE_KEY')]) {
-          sh '''
-            set -euo pipefail
-            COSIGN_EXPERIMENTAL=1 cosign sign --key env://COSIGN_PRIVATE_KEY ${IMAGE_REF}
-          '''
+        withCredentials([usernamePassword(credentialsId: "harbor-robot-${DEPLOY_ENV}", usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASSWORD')]) {
+          container('trivy') {
+            sh '''
+              set -euo pipefail
+              cd ${WORKSPACE}
+              trivy image --username "${HARBOR_USER}" --password "${HARBOR_PASSWORD}" --severity ${TRIVY_SEVERITY} --exit-code 1 --ignore-unfixed=false --format json -o reports/trivy-image.json ${IMAGE_REF}
+            '''
+          }
         }
       }
     }
-    stage('Attest Vulnerabilities') {
+    stage('Sign & Attest') {
       steps {
         withCredentials([string(credentialsId: 'cosign-key', variable: 'COSIGN_PRIVATE_KEY')]) {
-          sh '''
-            set -euo pipefail
-            cosign attest --predicate trivy.json --type ${COSIGN_ATTESTATION_TYPE} --key env://COSIGN_PRIVATE_KEY ${IMAGE_REF}
-          '''
+          container('cosign') {
+            sh '''
+              set -euo pipefail
+              cosign sign --yes --key env://COSIGN_PRIVATE_KEY ${IMAGE_REF}
+              cosign attest --yes --predicate reports/trivy-image.json --type ${COSIGN_ATTESTATION_TYPE} --key env://COSIGN_PRIVATE_KEY ${IMAGE_REF}
+            '''
+          }
         }
       }
     }
     stage('Admission Dry Run') {
       steps {
-        sh '''
-          set -euo pipefail
-          cosign verify --key k8s://configmap/cosign-public-key/key ${IMAGE_REF}
-        '''
+        container('cosign') {
+          sh '''
+            set -euo pipefail
+            cosign verify --key k8s://configmap/cosign-public-key/key ${IMAGE_REF}
+          '''
+        }
       }
     }
     stage('GitOps Update') {
       steps {
-        sh '''
-          set -euo pipefail
-          echo "image: ${IMAGE_REF}" > kustomization.patch
-          # Apply patch to GitOps repo (placeholder)
-        '''
+        container('tools') {
+          sh '''
+            set -euo pipefail
+            cd ${WORKSPACE}
+            cat > reports/gitops-patch.yaml <<'PATCH'
+            images:
+            - name: ${IMAGE_NAME}
+              newName: ${HARBOR_HOST}/${HARBOR_PROJECT}/${IMAGE_NAME}
+              newTag: ${IMAGE_TAG}
+PATCH
+          '''
+        }
+      }
+    }
+    stage('DAST (OWASP ZAP)') {
+      when {
+        expression { env.DAST_TARGET_URL?.trim() }
+      }
+      steps {
+        container('zap') {
+          sh '''
+            set -euo pipefail
+            cd ${WORKSPACE}
+            /zap/zap-baseline.py -t ${DAST_TARGET_URL} -r reports/zap-baseline.html -x reports/zap-report.xml -J reports/zap-report.json -m 1
+            if [ -n "${SECURITY_REPORT_WEBHOOK:-}" ]; then
+              curl -sSf -X POST -H "Content-Type: application/xml" --data-binary @reports/zap-report.xml "${SECURITY_REPORT_WEBHOOK}"
+            fi
+          '''
+        }
       }
     }
   }
   post {
     always {
-      sh 'rm -f trivy.json'
+      container('tools') {
+        sh 'ls reports || true'
+      }
+      archiveArtifacts artifacts: 'reports/**/*', allowEmptyArchive: true
     }
   }
 }

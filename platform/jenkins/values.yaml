@@ -1,0 +1,188 @@
+controller:
+  image: jenkins/jenkins
+  tag: lts-jdk17
+  installPlugins:
+    - kubernetes:4331.vb_905b_905598b
+    - workflow-aggregator:596.v8c21c963d92d
+    - git:5.2.2
+    - configuration-as-code:1814.vcc4899cfd3b0
+    - credentials-binding:631.v861c06d062b4
+    - pipeline-stage-view:2.34
+    - warnings-ng:10.18.0
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  serviceType: ClusterIP
+  nodeSelector:
+    workload: platform
+  tolerations:
+    - key: workload
+      operator: Equal
+      value: platform
+      effect: NoSchedule
+  JCasC:
+    configScripts:
+      kubernetes-agents: |
+        jenkins:
+          clouds:
+            - kubernetes:
+                name: "kubernetes"
+                serverUrl: "https://kubernetes.default.svc"
+                namespace: jenkins
+                jenkinsUrl: "http://jenkins.jenkins.svc.cluster.local:8080"
+                directConnection: true
+                connectTimeout: 60
+                readTimeout: 120
+                maxRequestsPerHostStr: "32"
+                retentionTimeout: 5
+                templates:
+                  - name: "ci-default"
+                    namespace: jenkins
+                    label: "k8s ci tools"
+                    nodeSelector: "workload=ci"
+                    yaml: |-
+                      apiVersion: v1
+                      kind: Pod
+                      metadata:
+                        labels:
+                          jenkins/role: ci-agent
+                      spec:
+                        serviceAccountName: jenkins
+                        restartPolicy: Never
+                        nodeSelector:
+                          workload: ci
+                        tolerations:
+                          - key: "workload"
+                            operator: "Equal"
+                            value: "ci"
+                            effect: "NoSchedule"
+                        volumes:
+                          - name: workspace
+                            emptyDir: {}
+                          - name: docker-config
+                            emptyDir: {}
+                        containers:
+                          - name: jnlp
+                            image: jenkins/inbound-agent:3256.v88fa_3348920d-5
+                            args: ["$(JENKINS_SECRET)", "$(JENKINS_NAME)"]
+                            resources:
+                              requests:
+                                cpu: "250m"
+                                memory: "256Mi"
+                              limits:
+                                cpu: "500m"
+                                memory: "512Mi"
+                            volumeMounts:
+                              - name: workspace
+                                mountPath: /home/jenkins/agent
+                            env:
+                              - name: JENKINS_URL
+                                value: http://jenkins.jenkins.svc.cluster.local:8080
+                              - name: JENKINS_PROTOCOLS
+                                value: JNLP4-plain
+                          - name: tools
+                            image: mcr.microsoft.com/devcontainers/base:bookworm
+                            command: ["bash", "-c", "cat"]
+                            tty: true
+                            resources:
+                              requests:
+                                cpu: "500m"
+                                memory: "1Gi"
+                              limits:
+                                cpu: "2"
+                                memory: "4Gi"
+                            volumeMounts:
+                              - name: workspace
+                                mountPath: /workspace
+                          - name: kaniko
+                            image: gcr.io/kaniko-project/executor:v1.23.2
+                            args: ["--help"]
+                            env:
+                              - name: DOCKER_CONFIG
+                                value: /kaniko/.docker
+                            volumeMounts:
+                              - name: workspace
+                                mountPath: /workspace
+                              - name: docker-config
+                                mountPath: /kaniko/.docker
+                            resources:
+                              requests:
+                                cpu: "500m"
+                                memory: "1Gi"
+                              limits:
+                                cpu: "2"
+                                memory: "2Gi"
+                          - name: trivy
+                            image: aquasec/trivy:0.50.1
+                            command: ["sh", "-c", "sleep 3600"]
+                            tty: true
+                            volumeMounts:
+                              - name: workspace
+                                mountPath: /workspace
+                            resources:
+                              requests:
+                                cpu: "500m"
+                                memory: "512Mi"
+                              limits:
+                                cpu: "1"
+                                memory: "1Gi"
+                          - name: semgrep
+                            image: returntocorp/semgrep:1.66.0
+                            command: ["sh", "-c", "sleep 3600"]
+                            tty: true
+                            volumeMounts:
+                              - name: workspace
+                                mountPath: /workspace
+                            resources:
+                              requests:
+                                cpu: "500m"
+                                memory: "512Mi"
+                              limits:
+                                cpu: "1"
+                                memory: "1Gi"
+                          - name: gitleaks
+                            image: zricethezav/gitleaks:8.18.4
+                            command: ["sh", "-c", "sleep 3600"]
+                            tty: true
+                            volumeMounts:
+                              - name: workspace
+                                mountPath: /workspace
+                            resources:
+                              requests:
+                                cpu: "250m"
+                                memory: "256Mi"
+                              limits:
+                                cpu: "500m"
+                                memory: "512Mi"
+                          - name: zap
+                            image: owasp/zap2docker-stable
+                            command: ["sh", "-c", "sleep 3600"]
+                            tty: true
+                            volumeMounts:
+                              - name: workspace
+                                mountPath: /workspace
+                            resources:
+                              requests:
+                                cpu: "500m"
+                                memory: "1Gi"
+                              limits:
+                                cpu: "1"
+                                memory: "2Gi"
+                          - name: cosign
+                            image: cgr.dev/chainguard/cosign:latest
+                            command: ["sh", "-c", "sleep 3600"]
+                            tty: true
+                            volumeMounts:
+                              - name: workspace
+                                mountPath: /workspace
+                            resources:
+                              requests:
+                                cpu: "250m"
+                                memory: "256Mi"
+                              limits:
+                                cpu: "500m"
+                                memory: "512Mi"
