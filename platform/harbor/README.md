@@ -40,7 +40,17 @@ This guide defines how Harbor is deployed and integrated with the platform suppl
 ## Projects and namespaces
 - Create environment projects: `dev`, `uat`, `prod` (and team-based projects as needed). Enable content trust and immutable tags on `prod`.
 - Map Kubernetes namespaces to Harbor projects via image path: `harbor.registry.example.com/<project>/<app>:<tag>`.
-- Replication rules (optional) can push `prod` artifacts to a disaster-recovery Harbor or cloud registry.
+- Replication rules push `prod` artifacts to a disaster-recovery Harbor or cloud registry; see [Replication and DR](#replication-and-dr-readiness).
+
+## Replication and DR readiness
+1. Register the DR registry in Harbor (`Administration → Registries`) and note the registry ID.
+2. Post a replication policy using `platform/harbor/replication-policy.dr.json`, replacing `dest_registry.id` with the DR registry ID and updating the cron trigger if needed:
+   ```bash
+   curl -u admin:$HARBOR_ADMIN_PASSWORD -X POST https://harbor.registry.example.com/api/v2.0/replication/policies \
+     -H 'Content-Type: application/json' -d @platform/harbor/replication-policy.dr.json
+   ```
+3. Validate replication: push a tagged image to `prod`, trigger a manual execution (`POST /api/v2.0/replication/executions`), and pull the artifact from the DR endpoint. Capture output of `curl .../replication/executions` for evidence.
+4. RPO/RTO: schedule runs every 4 hours by default; adjust `trigger.trigger_settings.cron` to meet target RPO. Perform a DR pull/signature verification monthly.
 
 ## I2 — Proxy cache configuration
 - For each upstream (Docker Hub, ghcr.io, quay.io), create a **proxy cache project** in Harbor. Example via API:
@@ -76,5 +86,5 @@ This guide defines how Harbor is deployed and integrated with the platform suppl
 - Enable audit logs shipping to the central log stack (e.g., via fluent-bit tailing `harbor-core` logs) to trace robot account actions.
 
 ## Disaster recovery and testing
-- DR exercises: quarterly restore of Harbor into an isolated namespace using the latest Velero backup + registry export; validate login, projects, and signatures.
+- DR exercises: quarterly restore of Harbor into an isolated namespace using the latest Velero backup + registry export; validate login, projects, and signatures. Replication drills are detailed above and in `runbooks/harbor-supply-chain.md`.
 - Keep offline export of signing public keys and proxy cache endpoints to speed up cold-site recovery.

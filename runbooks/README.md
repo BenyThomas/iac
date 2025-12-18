@@ -7,3 +7,4 @@ Operational runbooks for the on‑prem RKE2 platform.
 - [RKE2 upgrade](upgrade-rke2.md)
 - [Networking acceptance (CNI/MetalLB/Ingress)](networking-acceptance.md)
 - [Harbor registry + supply chain security](harbor-supply-chain.md)
+- [Backup, restore, and disaster recovery](backup-disaster-recovery.md)

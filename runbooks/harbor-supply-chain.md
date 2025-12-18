@@ -75,6 +75,12 @@ Use this runbook to deploy Harbor and enforce image supply chain controls across
 4. Admission attestation (optional stricter gate): apply `policies/supply-chain/vuln-attestation-thresholds.yaml` to require a cosign vulnerability attestation showing zero critical issues in `prod`.
 5. Exceptions: add CVE allowlist entry with expiry in Harbor project settings and link to the approved ticket in the change record.
 
+## I6 — Replication and DR
+1. Register the DR Harbor/registry under `Administration → Registries` and capture its registry ID.
+2. Apply the replication policy in `platform/harbor/replication-policy.dr.json`, updating `dest_registry.id` for the DR registry and `dest_namespace` if needed. Default schedule is every 4 hours.
+3. Manual test (monthly): push a new tag to `prod`, trigger replication with `POST /api/v2.0/replication/executions` for the policy ID, and pull the artifact from the DR endpoint. Verify cosign signature if enforced.
+4. Evidence: export replication execution status and tag digests from both sites. Record RPO/RTO achieved and remediation for any failed repositories.
+
 ## Evidence collection
 - Keep helm release version, commit hash of Jenkinsfile used, and Kyverno policy report output in the change ticket.
 - Archive cosign verification output and Harbor scan reports for the promoted artifact tag.
