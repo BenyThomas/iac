@@ -1,0 +1,60 @@
+# MetalLB IP pools for on-prem clusters
+# Update addresses to match the VLAN/segment reserved for Kubernetes LoadBalancers.
+
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: lb-external
+  namespace: metallb-system
+spec:
+  addresses:
+    - 10.20.30.100-10.20.30.119
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: lb-external-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - lb-external
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: lb-internal
+  namespace: metallb-system
+spec:
+  addresses:
+    - 10.20.40.50-10.20.40.59
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: lb-internal-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - lb-internal
+---
+# Optional: enable BGP instead of (or in addition to) L2 by defining peers and advertisements.
+# Uncomment and update values if BGP is required.
+# apiVersion: metallb.io/v1beta2
+# kind: BGPPeer
+# metadata:
+#   name: edge-router
+#   namespace: metallb-system
+# spec:
+#   myASN: 64513
+#   peerASN: 64512
+#   peerAddress: 10.20.30.1
+#   sourceAddress: 10.20.30.10
+# ---
+# apiVersion: metallb.io/v1beta1
+# kind: BGPAdvertisement
+# metadata:
+#   name: lb-external-bgp
+#   namespace: metallb-system
+# spec:
+#   ipAddressPools:
+#     - lb-external
