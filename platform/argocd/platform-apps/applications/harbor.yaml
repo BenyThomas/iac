@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-harbor
+  namespace: argocd
+spec:
+  destination:
+    namespace: harbor-system
+    server: https://kubernetes.default.svc
+  project: platform
+  source:
+    repoURL: https://github.com/example/onprem-platform.git
+    path: platform/harbor/manifests
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
