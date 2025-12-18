@@ -1,0 +1,106 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: baseline-pod-security
+  annotations:
+    policies.kyverno.io/title: Baseline Pod Security
+    policies.kyverno.io/category: Platform Security
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: |
+      Enforces baseline pod hardening across application namespaces by blocking
+      privileged containers, host networking, and hostPath mounts while
+      requiring non-root execution and read-only root filesystems unless an
+      exemption annotation is present.
+spec:
+  validationFailureAction: Enforce
+  failurePolicy: Fail
+  background: true
+  rules:
+    - name: enforce-nonroot-readonly
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchExpressions:
+                  - key: env
+                    operator: In
+                    values:
+                      - dev
+                      - uat
+                      - prod
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.annotations.\"security.platform/psa-exempt\" }}"
+            operator: NotEquals
+            value: "true"
+      validate:
+        message: "Containers must run as non-root with read-only root filesystems and no privilege escalation. Set security.platform/psa-exempt=true only when justified."
+        foreach:
+          - list: "request.object.spec.containers[]"
+            pattern:
+              securityContext:
+                runAsNonRoot: true
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                privileged: false
+          - list: "request.object.spec.initContainers[]"
+            pattern:
+              securityContext:
+                runAsNonRoot: true
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                privileged: false
+    - name: block-hostnetwork
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchExpressions:
+                  - key: env
+                    operator: In
+                    values:
+                      - dev
+                      - uat
+                      - prod
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.annotations.\"security.platform/allow-hostnetwork\" }}"
+            operator: NotEquals
+            value: "true"
+      validate:
+        message: "hostNetwork is not permitted; annotate with security.platform/allow-hostnetwork=true for approved exceptions only."
+        pattern:
+          spec:
+            =(hostNetwork): false
+    - name: block-hostpath
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchExpressions:
+                  - key: env
+                    operator: In
+                    values:
+                      - dev
+                      - uat
+                      - prod
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.annotations.\"security.platform/allow-hostpath\" }}"
+            operator: NotEquals
+            value: "true"
+      validate:
+        message: "hostPath mounts are blocked; use CSI/CSI projected volumes or annotate security.platform/allow-hostpath=true for approved break-glass."
+        foreach:
+          - list: "request.object.spec.volumes[]"
+            deny:
+              conditions:
+                all:
+                  - key: "{{ element.hostPath }}"
+                    operator: Exists

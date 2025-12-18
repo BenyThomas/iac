@@ -26,3 +26,13 @@ kubectl label ns prod env=prod
 kubectl label ns uat env=uat
 kubectl apply -f policies/supply-chain/
 ```
+
+## Admission control (Epic L — Policy enforcement)
+- `security/pod-security-baseline.yaml` — blocks privileged pods, host networking, and hostPath mounts while requiring non-root + read-only root filesystems. Allow break-glass via pod annotations `security.platform/psa-exempt=true`, `security.platform/allow-hostnetwork=true`, or `security.platform/allow-hostpath=true`.
+- `security/registry-allowlist-and-tags.yaml` — enforces Harbor-only images in protected namespaces (`env=uat|prod` or `security.platform/protected=true`), blocks `:latest` tags in prod, and requires digests for workloads labeled `app.kubernetes.io/tier=critical` or `security.platform/tier=critical`.
+
+Apply after labeling namespaces with `env=dev|uat|prod` and adding `security.platform/protected=true` to platform namespaces (e.g., `platform-services`, `monitoring`, `logging`) as needed:
+```bash
+kubectl apply -f policies/security/pod-security-baseline.yaml
+kubectl apply -f policies/security/registry-allowlist-and-tags.yaml
+```

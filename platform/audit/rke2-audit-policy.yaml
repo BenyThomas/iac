@@ -1,0 +1,51 @@
+apiVersion: audit.k8s.io/v1
+kind: Policy
+metadata:
+  name: rke2-audit-policy
+# Baseline audit policy capturing authentication, RBAC, and resource changes while
+# suppressing health/metrics noise.
+rules:
+  - level: None
+    nonResourceURLs:
+      - "/healthz*"
+      - "/livez"
+      - "/readyz"
+      - "/metrics"
+      - "/version"
+  - level: RequestResponse
+    resources:
+      - group: ""
+        resources: ["secrets", "configmaps", "serviceaccounts/token"]
+      - group: "certificates.k8s.io"
+        resources: ["certificatesigningrequests"]
+      - group: "authentication.k8s.io"
+        resources: ["tokenreviews"]
+      - group: "authorization.k8s.io"
+        resources: ["subjectaccessreviews"]
+  - level: RequestResponse
+    verbs: ["create", "update", "patch", "delete", "deletecollection"]
+    resources:
+      - group: ""
+        resources: ["pods", "pods/ephemeralcontainers", "pods/attach", "pods/exec", "pods/portforward"]
+      - group: "apps"
+        resources: ["deployments", "daemonsets", "statefulsets", "replicasets"]
+      - group: "batch"
+        resources: ["jobs", "cronjobs"]
+  - level: Metadata
+    resources:
+      - group: ""
+        resources: ["namespaces", "nodes", "pods", "services", "endpoints", "persistentvolumes", "persistentvolumeclaims"]
+      - group: "rbac.authorization.k8s.io"
+        resources: ["roles", "clusterroles", "rolebindings", "clusterrolebindings"]
+      - group: "networking.k8s.io"
+        resources: ["networkpolicies", "ingresses"]
+      - group: "policy"
+        resources: ["poddisruptionbudgets"]
+      - group: "apps"
+        resources: ["deployments", "daemonsets", "statefulsets", "replicasets"]
+      - group: "batch"
+        resources: ["jobs", "cronjobs"]
+      - group: "events.k8s.io"
+        resources: ["events"]
+    omitStages:
+      - "RequestReceived"
