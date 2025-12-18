@@ -1,0 +1,58 @@
+# Cilium Helm values for RKE2 clusters
+# Scope: on-prem, direct routing preferred, kube-proxy replacement enabled.
+
+kubeProxyReplacement: strict
+routingMode: native
+autoDirectNodeRoutes: true
+ipv4NativeRoutingCIDR: "10.42.0.0/16" # align with cluster pod CIDR
+
+k8sServiceHost: "api.example.internal" # override per cluster via --set k8sServiceHost=<vip-or-host>
+k8sServicePort: 6443
+
+operator:
+  replicas: 2
+
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+  ui:
+    enabled: false
+
+policyEnforcementMode: default
+
+prometheus:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+
+bpf:
+  masquerade: true
+  tproxy: true
+
+ipam:
+  mode: kubernetes
+
+securityContext:
+  capabilities:
+    ciliumAgent:
+      - CHOWN
+      - KILL
+      - NET_ADMIN
+      - NET_RAW
+      - IPC_LOCK
+      - SYS_ADMIN
+      - SYS_RESOURCE
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+      - AUDIT_WRITE
+    cleanCiliumState:
+      - NET_ADMIN
+      - SYS_ADMIN
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi

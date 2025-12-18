@@ -1,0 +1,65 @@
+# Example ingress templates for external and internal entrypoints
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo-external
+  namespace: demo
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+    nginx.ingress.kubernetes.io/enable-modsecurity: "false"
+  labels:
+    expose: external
+spec:
+  ingressClassName: external
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: demo-external-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: demo-web
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo-internal
+  namespace: demo
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+  labels:
+    expose: internal
+spec:
+  ingressClassName: internal
+  tls:
+    - hosts:
+        - app.internal.example.com
+      secretName: demo-internal-tls
+  rules:
+    - host: app.internal.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: demo-web
+                port:
+                  number: 80

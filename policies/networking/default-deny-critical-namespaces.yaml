@@ -1,0 +1,57 @@
+# Default-deny NetworkPolicies for critical platform namespaces
+# Apply with: kubectl apply -f policies/networking/default-deny-critical-namespaces.yaml
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kube-system-default-deny
+  namespace: kube-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingress-nginx-default-deny
+  namespace: ingress-nginx
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: monitoring-default-deny
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: logging-default-deny
+  namespace: logging
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: platform-services-default-deny
+  namespace: platform-services
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress

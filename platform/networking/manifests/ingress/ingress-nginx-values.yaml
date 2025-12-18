@@ -1,0 +1,51 @@
+controller:
+  replicaCount: 2
+  allowSnippetAnnotations: false
+  ingressClassResource:
+    name: external
+    controllerValue: "k8s.io/ingress-nginx-external"
+    default: false
+  service:
+    type: LoadBalancer
+    externalTrafficPolicy: Local
+    annotations:
+      metallb.universe.tf/address-pool: lb-external
+  config:
+    proxy-body-size: "16m"
+    proxy-read-timeout: "120"
+    proxy-send-timeout: "120"
+    client-body-buffer-size: "256k"
+    use-forwarded-headers: "true"
+    enable-brotli: "true"
+    hsts: "true"
+    hsts-include-subdomains: "true"
+    hsts-max-age: "31536000"
+    http-snippet: |
+      proxy_ignore_client_abort on;
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "Referrer-Policy: no-referrer-when-downgrade";
+  extraArgs:
+    enable-ssl-passthrough: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+  metrics:
+    enabled: true
+
+  admissionWebhooks:
+    enabled: true
+    patch:
+      enabled: true
+
+revisionHistoryLimit: 3
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+updateStrategy:
+  rollingUpdate:
+    maxUnavailable: 1
+  type: RollingUpdate
