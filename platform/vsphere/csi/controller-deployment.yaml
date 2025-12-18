@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vsphere-csi-controller
+  namespace: vmware-system-csi
+  labels:
+    app.kubernetes.io/name: vsphere-csi
+    app.kubernetes.io/component: controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vsphere-csi
+      app.kubernetes.io/component: controller
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vsphere-csi
+        app.kubernetes.io/component: controller
+    spec:
+      serviceAccountName: vsphere-csi-controller
+      priorityClassName: system-cluster-critical
+      containers:
+        - name: csi-provisioner
+          image: registry.k8s.io/sig-storage/csi-provisioner:v4.0.1
+          args:
+            - "--v=2"
+            - "--csi-address=$(ADDRESS)"
+            - "--feature-gates=Topology=true"
+            - "--leader-election=true"
+            - "--default-fstype=ext4"
+            - "--extra-create-metadata=true"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: csi-attacher
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.4.2
+          args:
+            - "--v=2"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election=true"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: csi-resizer
+          image: registry.k8s.io/sig-storage/csi-resizer:v1.10.0
+          args:
+            - "--v=2"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election=true"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: csi-snapshotter
+          image: registry.k8s.io/sig-storage/csi-snapshotter:v6.3.2
+          args:
+            - "--v=2"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election=true"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: liveness-probe
+          image: registry.k8s.io/sig-storage/livenessprobe:v2.12.0
+          args:
+            - "--v=2"
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: vsphere-csi-controller
+          image: gcr.io/cloud-provider-vsphere/csi/release/driver:v3.0.3
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--endpoint=unix:///csi/csi.sock"
+            - "--v=4"
+            - "--config=/etc/cloud/csi-vsphere.conf"
+          env:
+            - name: VSPHERE_CSI_CONFIG
+              value: /etc/cloud/csi-vsphere.conf
+            - name: X_CSI_MODE
+              value: controller
+          volumeMounts:
+            - name: cloud-config
+              mountPath: /etc/cloud
+              readOnly: true
+            - name: socket-dir
+              mountPath: /csi
+      volumes:
+        - name: socket-dir
+          emptyDir: {}
+        - name: cloud-config
+          secret:
+            secretName: vsphere-config-secret
+            items:
+              - key: csi-vsphere.conf
+                path: csi-vsphere.conf

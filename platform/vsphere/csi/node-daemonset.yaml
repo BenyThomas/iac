@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vsphere-csi-node
+  namespace: vmware-system-csi
+  labels:
+    app.kubernetes.io/name: vsphere-csi
+    app.kubernetes.io/component: node
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vsphere-csi
+      app.kubernetes.io/component: node
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vsphere-csi
+        app.kubernetes.io/component: node
+    spec:
+      serviceAccountName: vsphere-csi-node
+      hostNetwork: true
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: node-driver-registrar
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.9.3
+          args:
+            - "--v=2"
+            - "--csi-address=/csi/csi.sock"
+            - "--kubelet-registration-path=/var/lib/kubelet/plugins/csi.vsphere.vmware.com/csi.sock"
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /csi
+            - name: registration-dir
+              mountPath: /registration
+        - name: liveness-probe
+          image: registry.k8s.io/sig-storage/livenessprobe:v2.12.0
+          args:
+            - "--v=2"
+            - "--csi-address=/csi/csi.sock"
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /csi
+        - name: vsphere-csi-node
+          image: gcr.io/cloud-provider-vsphere/csi/release/driver:v3.0.3
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          args:
+            - "--endpoint=unix:///csi/csi.sock"
+            - "--v=4"
+            - "--config=/etc/cloud/csi-vsphere.conf"
+          env:
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: VSPHERE_CSI_CONFIG
+              value: /etc/cloud/csi-vsphere.conf
+            - name: X_CSI_MODE
+              value: node
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /csi
+            - name: pods-mount-dir
+              mountPath: /var/lib/kubelet/pods
+              mountPropagation: Bidirectional
+            - name: device-dir
+              mountPath: /dev
+            - name: cloud-config
+              mountPath: /etc/cloud
+              readOnly: true
+            - name: kubelet-dir
+              mountPath: /var/lib/kubelet
+              mountPropagation: HostToContainer
+      volumes:
+        - name: plugin-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/csi.vsphere.vmware.com
+            type: DirectoryOrCreate
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry
+            type: DirectoryOrCreate
+        - name: pods-mount-dir
+          hostPath:
+            path: /var/lib/kubelet/pods
+            type: DirectoryOrCreate
+        - name: device-dir
+          hostPath:
+            path: /dev
+            type: Directory
+        - name: cloud-config
+          secret:
+            secretName: vsphere-config-secret
+            items:
+              - key: csi-vsphere.conf
+                path: csi-vsphere.conf
+        - name: kubelet-dir
+          hostPath:
+            path: /var/lib/kubelet
+            type: Directory

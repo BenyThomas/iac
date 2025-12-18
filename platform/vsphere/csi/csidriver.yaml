@@ -1,0 +1,13 @@
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: csi.vsphere.vmware.com
+  labels:
+    app.kubernetes.io/name: vsphere-csi
+spec:
+  attachRequired: true
+  podInfoOnMount: false
+  fsGroupPolicy: File
+  storageCapacity: true
+  volumeLifecycleModes:
+    - Persistent

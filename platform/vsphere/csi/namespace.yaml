@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vmware-system-csi
+  labels:
+    addon: vsphere-csi
+    app.kubernetes.io/name: vsphere-csi
