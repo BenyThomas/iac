@@ -1,0 +1,13 @@
+pipeline {
+  agent any
+  stages {
+    stage('Checkout') { steps { checkout scm } }
+    stage('Build') { steps { echo 'Build app' } }
+    stage('Test') { steps { echo 'Run tests' } }
+    stage('Containerize') { steps { echo 'Build image' } }
+    stage('Scan') { steps { echo 'Run security scans' } }
+    stage('Sign') { steps { echo 'Cosign sign' } }
+    stage('Publish') { steps { echo 'Push to Harbor' } }
+    stage('GitOps Update') { steps { echo 'Update manifests for Argo CD' } }
+  }
+}

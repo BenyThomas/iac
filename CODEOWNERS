@@ -1,0 +1,5 @@
+* @platform-team
+/policies/ @security-team @platform-team
+/clusters/prod/ @security-team @platform-team
+/terraform/ @platform-team @infra-team
+/pipelines/ @platform-team @devsecops-team

@@ -1,0 +1,8 @@
+.terraform/
+terraform.tfstate*
+*.tfvars
+*.pem
+*.key
+*.pfx
+*.der
+secrets/

@@ -1,0 +1,17 @@
+vsphere_server       = "vcenter.company.local"
+vsphere_user         = "svc-terraform@company.local"
+vsphere_password     = "CHANGE_ME"
+allow_unverified_ssl = false
+
+datacenter = "DC01"
+dvs_name   = "DVS-PROD"
+
+site         = "DAR"
+cluster_name = "k8s-dar-uat-01"
+
+additional_tags = ["owner-platform", "costcenter-it"]
+
+resource_pools = {
+  platform = "RP-Platform"
+  apps     = "RP-Apps"
+}
