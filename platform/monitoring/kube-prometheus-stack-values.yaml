@@ -1,0 +1,121 @@
+# kube-prometheus-stack values for on-prem RKE2 clusters
+
+alertmanager:
+  enabled: true
+  ingress:
+    enabled: false
+  serviceAccount:
+    create: true
+  configNamespaceSelector: {}
+  configMapOverrideName: ""
+
+kube-state-metrics:
+  enabled: true
+
+kubelet:
+  serviceMonitor:
+    metricRelabelings: []
+
+prometheusOperator:
+  admissionWebhooks:
+    enabled: true
+    failurePolicy: Fail
+
+prometheus:
+  serviceAccount:
+    create: true
+  serviceMonitorSelectorNilUsesHelmValues: false
+  podMonitorSelectorNilUsesHelmValues: false
+  ruleSelectorNilUsesHelmValues: false
+  prometheusSpec:
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    retention: 15d
+    retentionSize: 50GiB
+    externalLabels:
+      cluster: onprem-rke2
+    enableAdminAPI: false
+    walCompression: true
+    podMonitorNamespaceSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    ruleNamespaceSelector: {}
+
+additionalPrometheusRulesMap:
+  platform-health:
+    groups:
+      - name: node-health
+        rules:
+          - alert: NodeHighCpuUtilization
+            expr: instance:node_cpu_utilisation:rate5m > 0.9
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High node CPU utilization"
+              description: "Node CPU usage is above 90% for 15 minutes. Investigate noisy neighbors or capacity."
+          - alert: NodeMemoryPressure
+            expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.9
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Low node memory available"
+              description: "Memory available on node is under 10% for 15 minutes."
+          - alert: NodeDiskPressure
+            expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) < 0.1
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Node disk space low"
+              description: "A node filesystem is below 10% free space."
+          - alert: NodeFilesystemReadOnly
+            expr: kube_node_status_condition{condition="ReadonlyFilesystem",status="true"} == 1
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Node filesystem is read-only"
+              description: "A node filesystem has entered read-only state; cordon and replace node."
+      - name: api-health
+        rules:
+          - alert: KubeApiErrorRate
+            expr: |
+              (sum(rate(apiserver_request_total{job="apiserver",code=~"5.."}[5m])) by (cluster) /
+              sum(rate(apiserver_request_total{job="apiserver"}[5m])) by (cluster)) > 0.01
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Kubernetes API error ratio high"
+              description: "API server 5xx responses exceed 1% over the last 10 minutes."
+
+additionalServiceMonitors: []
+additionalPodMonitors: []
+
+grafana:
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  defaultDashboardsEnabled: true
+  persistence:
+    enabled: true
+    size: 20Gi
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+    datasources:
+      enabled: true
+  service:
+    type: ClusterIP
+  env:
+    GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-admin}"
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki-gateway.logging.svc:80
+      jsonData:
+        maxLines: 5000

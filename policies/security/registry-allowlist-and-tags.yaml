@@ -1,0 +1,106 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: registry-governance
+  annotations:
+    policies.kyverno.io/title: Registry Allowlist and Tag Rules
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: |
+      Restricts images to the Harbor registry in protected namespaces, blocks
+      mutable tags in production, and requires digests for critical workloads to
+      prevent drift and ensure traceability.
+spec:
+  validationFailureAction: Enforce
+  failurePolicy: Fail
+  background: true
+  rules:
+    - name: harbor-only-in-protected-namespaces
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchExpressions:
+                  - key: env
+                    operator: In
+                    values:
+                      - uat
+                      - prod
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  security.platform/protected: "true"
+      validate:
+        message: "Only harbor.registry.example.com images are allowed in protected namespaces."
+        foreach:
+          - list: "request.object.spec.containers[]"
+            pattern:
+              image: "harbor.registry.example.com/*"
+          - list: "request.object.spec.initContainers[]"
+            pattern:
+              image: "harbor.registry.example.com/*"
+    - name: block-latest-in-prod
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchExpressions:
+                  - key: env
+                    operator: In
+                    values:
+                      - prod
+      validate:
+        message: "The :latest tag is not allowed in prod namespaces; pin an immutable tag or digest."
+        foreach:
+          - list: "request.object.spec.containers[]"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ regex_match(':latest$', element.image) }}"
+                    operator: Equals
+                    value: true
+          - list: "request.object.spec.initContainers[]"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ regex_match(':latest$', element.image) }}"
+                    operator: Equals
+                    value: true
+    - name: require-digests-for-critical-workloads
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              selector:
+                matchLabels:
+                  app.kubernetes.io/tier: critical
+          - resources:
+              kinds:
+                - Pod
+              selector:
+                matchLabels:
+                  security.platform/tier: critical
+      validate:
+        message: "Critical workloads must pin images by digest (image@sha256:...)."
+        foreach:
+          - list: "request.object.spec.containers[]"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.image }}"
+                    operator: NotMatches
+                    value: "@sha256:[a-fA-F0-9]{64}"
+          - list: "request.object.spec.initContainers[]"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.image }}"
+                    operator: NotMatches
+                    value: "@sha256:[a-fA-F0-9]{64}"
