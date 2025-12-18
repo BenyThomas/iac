@@ -1,0 +1,58 @@
+expose:
+  type: ingress
+  tls:
+    enabled: true
+    certSource: secret
+    secret:
+      secretName: harbor-tls
+  ingress:
+    hosts:
+      core: harbor.registry.example.com
+persistence:
+  persistentVolumeClaim:
+    registry:
+      storageClass: vsphere-block
+      accessMode: ReadWriteOnce
+      size: 500Gi
+    chartmuseum:
+      storageClass: vsphere-block
+      size: 20Gi
+    jobservice:
+      storageClass: vsphere-block
+      size: 20Gi
+    trivy:
+      storageClass: vsphere-block
+      size: 50Gi
+externalURL: https://harbor.registry.example.com
+harborAdminPassword: "${HARBOR_ADMIN_PASSWORD}"
+proxy:
+  httpProxy: http://proxy.example.com:3128
+  httpsProxy: https://proxy.example.com:3128
+  noProxy: ".cluster.local,.svc"
+chartmuseum:
+  enabled: false
+clair:
+  enabled: false
+trivy:
+  enabled: true
+  ignoreUnfixed: false
+  severity: "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL"
+jobservice:
+  replicas: 3
+core:
+  replicas: 3
+portal:
+  replicas: 2
+registry:
+  replicas: 2
+database:
+  type: external
+  external:
+    host: harbor-postgres.platform.svc
+    username: harbor
+    password: "${HARBOR_DB_PASSWORD}"
+    sslmode: require
+redis:
+  type: external
+  external:
+    addr: harbor-redis.platform.svc:6379

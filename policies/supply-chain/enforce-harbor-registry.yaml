@@ -1,0 +1,41 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: enforce-harbor-registry
+  annotations:
+    policies.kyverno.io/title: Enforce Harbor Registry Usage
+    policies.kyverno.io/category: Supply Chain
+    policies.kyverno.io/subject: Pod
+spec:
+  validationFailureAction: Enforce
+  failurePolicy: Fail
+  background: true
+  rules:
+    - name: only-allow-harbor-and-proxy
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+                - Job
+                - CronJob
+              namespaceSelector:
+                matchExpressions:
+                  - key: env
+                    operator: In
+                    values:
+                      - dev
+                      - uat
+                      - prod
+      validate:
+        message: "Images must come from Harbor (including proxy cache projects)."
+        foreach:
+          - list: "request.object.spec.containers[]"
+            pattern:
+              image: "harbor.registry.example.com/*"
+          - list: "request.object.spec.initContainers[]"
+            pattern:
+              image: "harbor.registry.example.com/*"

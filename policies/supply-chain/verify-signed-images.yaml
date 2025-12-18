@@ -1,0 +1,43 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-signed-images
+  annotations:
+    policies.kyverno.io/title: Verify Signed Images (Harbor)
+    policies.kyverno.io/category: Supply Chain
+    policies.kyverno.io/subject: Pod
+spec:
+  validationFailureAction: Enforce
+  failurePolicy: Fail
+  background: false
+  rules:
+    - name: verify-cosign-signatures
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+                - Job
+                - CronJob
+              namespaceSelector:
+                matchExpressions:
+                  - key: env
+                    operator: In
+                    values:
+                      - uat
+                      - prod
+      verifyImages:
+        - imageReferences:
+            - "harbor.registry.example.com/*"
+          attestors:
+            - entries:
+                - keys:
+                    publicKeys: k8s://configmap/cosign-public-key/key
+                    rekor:
+                      url: https://rekor.sigstore.dev
+          repository: harbor.registry.example.com
+          required: true
+          mutateDigest: true
