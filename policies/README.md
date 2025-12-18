@@ -13,3 +13,16 @@ kubectl apply -f policies/networking/platform-allow-rules.yaml
 ```
 
 Ensure application namespaces are labeled and sized appropriately before applying the posture in production clusters.
+
+## Supply chain (Epic I — Harbor)
+- `supply-chain/verify-signed-images.yaml` — Kyverno verifyImages rule enforcing Cosign signatures for Harbor-hosted images in `uat` and `prod` namespaces.
+- `supply-chain/enforce-harbor-registry.yaml` — restricts workloads to use Harbor (including proxy cache projects) across `dev/uat/prod`.
+- `supply-chain/vuln-attestation-thresholds.yaml` — requires vulnerability attestations with zero criticals in `uat` and zero criticals plus ≤5 highs in `prod`.
+
+Apply after publishing the Cosign public key ConfigMap and labeling namespaces with `env=dev|uat|prod`:
+```bash
+kubectl -n platform-services create configmap cosign-public-key --from-file=key=cosign.pub
+kubectl label ns prod env=prod
+kubectl label ns uat env=uat
+kubectl apply -f policies/supply-chain/
+```

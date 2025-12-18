@@ -6,3 +6,4 @@ Operational runbooks for the on‑prem RKE2 platform.
 - [Bootstrap RKE2 HA cluster](bootstrap-rke2-ha.md)
 - [RKE2 upgrade](upgrade-rke2.md)
 - [Networking acceptance (CNI/MetalLB/Ingress)](networking-acceptance.md)
+- [Harbor registry + supply chain security](harbor-supply-chain.md)

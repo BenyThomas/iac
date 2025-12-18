@@ -1,0 +1,78 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: vuln-attestation-thresholds
+  annotations:
+    policies.kyverno.io/title: Vulnerability Attestation Thresholds
+    policies.kyverno.io/category: Supply Chain
+    policies.kyverno.io/subject: Pod
+spec:
+  validationFailureAction: Enforce
+  failurePolicy: Fail
+  background: false
+  rules:
+    - name: uat-vuln-attestation
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+                - Job
+                - CronJob
+              namespaceSelector:
+                matchExpressions:
+                  - key: env
+                    operator: In
+                    values:
+                      - uat
+      verifyImages:
+        - imageReferences:
+            - "harbor.registry.example.com/uat/*"
+          attestors:
+            - entries:
+                - keys:
+                    publicKeys: k8s://configmap/cosign-public-key/key
+          attestations:
+            - type: https://cosign.sigstore.dev/attestation/vuln/v1
+              conditions:
+                - all:
+                    - key: "{{ attestation.summary.criticalCount }}"
+                      operator: Equals
+                      value: 0
+          repository: harbor.registry.example.com
+    - name: prod-vuln-attestation
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+                - Job
+                - CronJob
+              namespaceSelector:
+                matchExpressions:
+                  - key: env
+                    operator: In
+                    values:
+                      - prod
+      verifyImages:
+        - imageReferences:
+            - "harbor.registry.example.com/prod/*"
+          attestors:
+            - entries:
+                - keys:
+                    publicKeys: k8s://configmap/cosign-public-key/key
+          attestations:
+            - type: https://cosign.sigstore.dev/attestation/vuln/v1
+              conditions:
+                - all:
+                    - key: "{{ attestation.summary.criticalCount }}"
+                      operator: Equals
+                      value: 0
+                    - key: "{{ attestation.summary.highCount }}"
+                      operator: LessThanOrEquals
+                      value: 5
+          repository: harbor.registry.example.com

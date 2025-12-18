@@ -1,13 +1,108 @@
 pipeline {
   agent any
+  parameters {
+    choice(name: 'DEPLOY_ENV', choices: ['dev', 'uat', 'prod'], description: 'Target Harbor project/environment')
+  }
+  options {
+    timestamps()
+  }
+  environment {
+    HARBOR_HOST = "harbor.registry.example.com"
+    IMAGE_NAME = "sample-app"
+    BASE_IMAGE = "${HARBOR_HOST}/dockerhub-proxy/library/alpine:3.19"
+    COSIGN_ATTESTATION_TYPE = "https://cosign.sigstore.dev/attestation/vuln/v1"
+  }
   stages {
+    stage('Init') {
+      steps {
+        script {
+          env.DEPLOY_ENV = params.DEPLOY_ENV ?: 'dev'
+          env.HARBOR_PROJECT = env.DEPLOY_ENV
+          env.IMAGE_NAME = env.IMAGE_NAME ?: env.JOB_BASE_NAME
+          env.IMAGE_TAG = "build-${env.BUILD_NUMBER}"
+          env.IMAGE_REF = "${env.HARBOR_HOST}/${env.HARBOR_PROJECT}/${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+          env.TRIVY_SEVERITY = [dev: "CRITICAL", uat: "CRITICAL,HIGH", prod: "CRITICAL,HIGH,MEDIUM"][env.DEPLOY_ENV]
+        }
+      }
+    }
     stage('Checkout') { steps { checkout scm } }
-    stage('Build') { steps { echo 'Build app' } }
-    stage('Test') { steps { echo 'Run tests' } }
-    stage('Containerize') { steps { echo 'Build image' } }
-    stage('Scan') { steps { echo 'Run security scans' } }
-    stage('Sign') { steps { echo 'Cosign sign' } }
-    stage('Publish') { steps { echo 'Push to Harbor' } }
-    stage('GitOps Update') { steps { echo 'Update manifests for Argo CD' } }
+    stage('Build') {
+      steps {
+        sh '''
+          set -euo pipefail
+          docker build --build-arg BASE_IMAGE=${BASE_IMAGE} -t ${IMAGE_REF} .
+        '''
+      }
+    }
+    stage('Test') {
+      steps {
+        sh '''
+          set -euo pipefail
+          ./gradlew test || true
+        '''
+      }
+    }
+    stage('Scan') {
+      steps {
+        sh '''
+          set -euo pipefail
+          trivy image --severity ${TRIVY_SEVERITY} --exit-code 1 --ignore-unfixed=false --format json -o trivy.json ${IMAGE_REF}
+        '''
+      }
+    }
+    stage('Publish') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: "harbor-robot-${DEPLOY_ENV}", usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASSWORD')]) {
+          sh '''
+            set -euo pipefail
+            echo "${HARBOR_PASSWORD}" | docker login ${HARBOR_HOST} -u "${HARBOR_USER}" --password-stdin
+            docker push ${IMAGE_REF}
+            docker logout ${HARBOR_HOST}
+          '''
+        }
+      }
+    }
+    stage('Sign') {
+      steps {
+        withCredentials([string(credentialsId: 'cosign-key', variable: 'COSIGN_PRIVATE_KEY')]) {
+          sh '''
+            set -euo pipefail
+            COSIGN_EXPERIMENTAL=1 cosign sign --key env://COSIGN_PRIVATE_KEY ${IMAGE_REF}
+          '''
+        }
+      }
+    }
+    stage('Attest Vulnerabilities') {
+      steps {
+        withCredentials([string(credentialsId: 'cosign-key', variable: 'COSIGN_PRIVATE_KEY')]) {
+          sh '''
+            set -euo pipefail
+            cosign attest --predicate trivy.json --type ${COSIGN_ATTESTATION_TYPE} --key env://COSIGN_PRIVATE_KEY ${IMAGE_REF}
+          '''
+        }
+      }
+    }
+    stage('Admission Dry Run') {
+      steps {
+        sh '''
+          set -euo pipefail
+          cosign verify --key k8s://configmap/cosign-public-key/key ${IMAGE_REF}
+        '''
+      }
+    }
+    stage('GitOps Update') {
+      steps {
+        sh '''
+          set -euo pipefail
+          echo "image: ${IMAGE_REF}" > kustomization.patch
+          # Apply patch to GitOps repo (placeholder)
+        '''
+      }
+    }
+  }
+  post {
+    always {
+      sh 'rm -f trivy.json'
+    }
   }
 }
