@@ -3,8 +3,8 @@
 Purpose: reproducible bootstrap for a highly available RKE2 cluster with correct labels/taints.
 
 ## Prerequisites
-- Network: VIP/DNS for Kubernetes API (`api.cluster.local`) is functional (see HA endpoint runbook).
-- Nodes: 3 control-plane VMs (etcd collocated) and 7 worker VMs with time sync, SELinux/AppArmor as per baseline hardening, and container runtime prerequisites satisfied.
+- Network: VIP/DNS for Kubernetes API (`api.tcbbank.co.tz`) is functional (see HA endpoint runbook). VIP `172.25.2.40` fronts the control-plane nodes `172.25.2.41-43`.
+- Nodes: 3 control-plane VMs (etcd collocated) and 7 worker VMs (`172.25.2.44-50`) with time sync, SELinux/AppArmor as per baseline hardening, and container runtime prerequisites satisfied.
 - Access: SSH with sudo, outbound internet/proxy for RKE2 artifacts, or mirrored registry endpoint.
 - Artifacts: `rke2-config.yaml` template stored in Ansible or secret manager (tokens/certs handled securely).
 
@@ -23,11 +23,11 @@ Purpose: reproducible bootstrap for a highly available RKE2 cluster with correct
    - `systemctl enable --now rke2-server`.
    - Export `/var/lib/rancher/rke2/server/node-token`.
 2. Control-plane #2 and #3 join:
-   - Configure `rke2-config.yaml` with `server: https://api.cluster.local:9345` and same `tls-san` list.
+   - Configure `rke2-config.yaml` with `server: https://api.tcbbank.co.tz:9345` and same `tls-san` list.
    - Install RKE2 server as above and start the service.
    - Verify `kubectl get nodes -o wide` shows all three `Ready` with `node-role.kubernetes.io/control-plane: ""` and taint `node-role.kubernetes.io/control-plane=true:NoSchedule`.
 3. Worker joins (7 nodes):
-   - Template `rke2-agent` config pointing at `https://api.cluster.local:9345` using the shared token.
+   - Template `rke2-agent` config pointing at `https://api.tcbbank.co.tz:9345` using the shared token.
    - Install RKE2 agent and start.
    - Apply labels via cloud-init/Ansible after join:
      - Common: `node-role.kubernetes.io/worker=""`.

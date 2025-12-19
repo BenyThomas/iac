@@ -20,13 +20,18 @@ Example: `prod/loan-service`
 
 ## DNS records (minimum)
 
-| Endpoint | Record | Notes |
+| Endpoint | Record | Target / Notes |
 |---|---|---|
-| Kubernetes API | `api.<cluster>.<domain>` → control-plane VIP/L4 LB | Required before bootstrap; SAN on API serving certs. |
-| Ingress apps | `*.apps.<cluster>.<domain>` (wildcard) or per-app FQDNs | Points to ingress VIP/LB; used by HTTP01 challenges. |
-| Container registry | `registry.<domain>` | Harbor tier-0 service; SAN on registry certs. |
-| GitOps | `argocd.<cluster>.<domain>` | May also expose SSO callback URI. |
-| Monitoring | `grafana.<cluster>.<domain>` (HTTPs) and `prometheus.<cluster>.<domain>` (optional) | TLS via cert-manager; scoped to monitoring users only. |
+| Kubernetes API | `api.tcbbank.co.tz` | VIP for the control-plane HA endpoint (NAT/forwarded to `172.25.2.40`) and SAN on API certs. |
+| Ingress apps | `*.apps.tcbbank.co.tz` | Wildcard to the ingress VIP (NAT to ingress LB IP range). |
+| Container registry | `registry.tcbbank.co.tz` | Harbor ingress VIP; TLS uses the wildcard `tcbbank.co.tz` certificate. |
+| GitOps | `argocd.tcbbank.co.tz` | Exposed via ingress; update SSO callbacks to this host. |
+| Monitoring | `grafana.tcbbank.co.tz` and `prometheus.tcbbank.co.tz` | HTTPS behind ingress; locked to monitoring users. |
+
+### Node inventory (production RKE2)
+- Control plane: `172.25.2.41`, `172.25.2.42`, `172.25.2.43` (fronted by API VIP `172.25.2.40`).
+- Workers: `172.25.2.44`–`172.25.2.50`.
+- NAT: publish the VIPs/LB addresses above through the DMZ with 1:1 mapping to the same IPs to keep certificates valid for `*.tcbbank.co.tz`.
 
 ### DNS ownership and change control
 - Ownership: Platform team owns API/ingress records; Security approves TLS/PKI alignment; Network/DNS ops owns zone delegation and record creation in authoritative DNS.

@@ -6,7 +6,7 @@ routingMode: native
 autoDirectNodeRoutes: true
 ipv4NativeRoutingCIDR: "10.42.0.0/16" # align with cluster pod CIDR
 
-k8sServiceHost: "api.example.internal" # override per cluster via --set k8sServiceHost=<vip-or-host>
+k8sServiceHost: "api.tcbbank.co.tz" # override per cluster via --set k8sServiceHost=<vip-or-host>
 k8sServicePort: 6443
 
 operator:

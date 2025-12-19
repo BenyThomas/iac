@@ -11,9 +11,9 @@ This guide defines how Harbor is deployed and integrated with the platform suppl
 
 ## Prerequisites
 - RKE2 cluster with vSphere CSI (or NFS/ceph) and ingress (MetalLB + NGINX).
-- cert-manager issuers ready for `*.registry.example.com`.
+- cert-manager issuers ready for `*.tcbbank.co.tz`.
 - S3-compatible backup target (minio, on-prem object store) reachable from the cluster.
-- DNS `A`/`CNAME` for `harbor.registry.example.com` pointing at the ingress VIP.
+- DNS `A`/`CNAME` for `registry.tcbbank.co.tz` pointing at the ingress VIP.
 
 ## I1 — Deploy Harbor (HA-ready)
 1. Add the chart repo and review/update the provided values file (tunable per environment):
@@ -39,14 +39,14 @@ This guide defines how Harbor is deployed and integrated with the platform suppl
 
 ## Projects and namespaces
 - Create environment projects: `dev`, `uat`, `prod` (and team-based projects as needed). Enable content trust and immutable tags on `prod`.
-- Map Kubernetes namespaces to Harbor projects via image path: `harbor.registry.example.com/<project>/<app>:<tag>`.
+- Map Kubernetes namespaces to Harbor projects via image path: `registry.tcbbank.co.tz/<project>/<app>:<tag>`.
 - Replication rules push `prod` artifacts to a disaster-recovery Harbor or cloud registry; see [Replication and DR](#replication-and-dr-readiness).
 
 ## Replication and DR readiness
 1. Register the DR registry in Harbor (`Administration → Registries`) and note the registry ID.
 2. Post a replication policy using `platform/harbor/replication-policy.dr.json`, replacing `dest_registry.id` with the DR registry ID and updating the cron trigger if needed:
    ```bash
-   curl -u admin:$HARBOR_ADMIN_PASSWORD -X POST https://harbor.registry.example.com/api/v2.0/replication/policies \
+   curl -u admin:$HARBOR_ADMIN_PASSWORD -X POST https://registry.tcbbank.co.tz/api/v2.0/replication/policies \
      -H 'Content-Type: application/json' -d @platform/harbor/replication-policy.dr.json
    ```
 3. Validate replication: push a tagged image to `prod`, trigger a manual execution (`POST /api/v2.0/replication/executions`), and pull the artifact from the DR endpoint. Capture output of `curl .../replication/executions` for evidence.
@@ -55,11 +55,11 @@ This guide defines how Harbor is deployed and integrated with the platform suppl
 ## I2 — Proxy cache configuration
 - For each upstream (Docker Hub, ghcr.io, quay.io), create a **proxy cache project** in Harbor. Example via API:
   ```bash
-  curl -u admin:$HARBOR_ADMIN_PASSWORD -X POST https://harbor.registry.example.com/api/v2.0/projects \
+  curl -u admin:$HARBOR_ADMIN_PASSWORD -X POST https://registry.tcbbank.co.tz/api/v2.0/projects \
     -H 'Content-Type: application/json' \
     -d '{"project_name":"dockerhub-proxy","metadata":{"enable_content_trust":"false"},"registry_id":null,"storage_limit":-1,"project_type":"proxy_cache","proxy_cache":{"endpoint":"https://registry-1.docker.io"}}'
   ```
-- In Jenkins pipelines, pull all base images through the proxy path: `harbor.registry.example.com/dockerhub-proxy/library/alpine:3.19`.
+- In Jenkins pipelines, pull all base images through the proxy path: `registry.tcbbank.co.tz/dockerhub-proxy/library/alpine:3.19`.
 - Configure rate limit alerts on proxy cache projects and tune cache TTL per upstream rate limits.
 
 ## I3 — Robot accounts and credentials

@@ -29,7 +29,7 @@ spec:
                       - uat
       verifyImages:
         - imageReferences:
-            - "harbor.registry.example.com/uat/*"
+            - "registry.tcbbank.co.tz/uat/*"
           attestors:
             - entries:
                 - keys:
@@ -41,7 +41,7 @@ spec:
                     - key: "{{ attestation.summary.criticalCount }}"
                       operator: Equals
                       value: 0
-          repository: harbor.registry.example.com
+          repository: registry.tcbbank.co.tz
     - name: prod-vuln-attestation
       match:
         any:
@@ -60,7 +60,7 @@ spec:
                       - prod
       verifyImages:
         - imageReferences:
-            - "harbor.registry.example.com/prod/*"
+            - "registry.tcbbank.co.tz/prod/*"
           attestors:
             - entries:
                 - keys:
@@ -75,4 +75,4 @@ spec:
                     - key: "{{ attestation.summary.highCount }}"
                       operator: LessThanOrEquals
                       value: 5
-          repository: harbor.registry.example.com
+          repository: registry.tcbbank.co.tz

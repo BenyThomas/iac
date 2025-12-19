@@ -35,7 +35,7 @@ spec:
         foreach:
           - list: "request.object.spec.containers[]"
             pattern:
-              image: "harbor.registry.example.com/*"
+              image: "registry.tcbbank.co.tz/*"
           - list: "request.object.spec.initContainers[]"
             pattern:
-              image: "harbor.registry.example.com/*"
+              image: "registry.tcbbank.co.tz/*"

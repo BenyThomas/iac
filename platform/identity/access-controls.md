@@ -2,7 +2,7 @@
 
 ## Keycloak (SSO) integration
 - Configure the API server with OIDC settings (RKE2 `kube-apiserver-arg`):
-  - `--oidc-issuer-url=https://idp.example.com/realms/platform`
+  - `--oidc-issuer-url=https://idp.tcbbank.co.tz/realms/platform`
   - `--oidc-client-id=kubernetes`
   - `--oidc-username-claim=email` and `--oidc-groups-claim=groups`
   - `--oidc-ca-file=/etc/rancher/rke2/oidc-ca.pem` (enterprise PKI trust).

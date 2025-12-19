@@ -18,10 +18,10 @@ spec:
   ingressClassName: external
   tls:
     - hosts:
-        - app.example.com
+        - demo.apps.tcbbank.co.tz
       secretName: demo-external-tls
   rules:
-    - host: app.example.com
+    - host: demo.apps.tcbbank.co.tz
       http:
         paths:
           - path: /
@@ -50,10 +50,10 @@ spec:
   ingressClassName: internal
   tls:
     - hosts:
-        - app.internal.example.com
+        - demo-int.apps.tcbbank.co.tz
       secretName: demo-internal-tls
   rules:
-    - host: app.internal.example.com
+    - host: demo-int.apps.tcbbank.co.tz
       http:
         paths:
           - path: /

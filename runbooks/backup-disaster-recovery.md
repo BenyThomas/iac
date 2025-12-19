@@ -48,7 +48,7 @@ Use this runbook to prove automated backups and disaster recovery for control pl
 2. Trigger a manual replication and validate:
    ```bash
    curl -u admin:$HARBOR_ADMIN_PASSWORD -X POST \
-     https://harbor.registry.example.com/api/v2.0/replication/executions \
+     https://registry.tcbbank.co.tz/api/v2.0/replication/executions \
      -H 'Content-Type: application/json' \
      -d '{"policy_id":<prod-to-dr-policy-id>}'
    ```

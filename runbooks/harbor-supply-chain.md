@@ -4,7 +4,7 @@ Use this runbook to deploy Harbor and enforce image supply chain controls across
 
 ## Prerequisites
 - Platform cluster reachable with kubeconfig and Helm.
-- cert-manager issuers ready for `*.registry.example.com` TLS.
+- cert-manager issuers ready for `*.tcbbank.co.tz` TLS.
 - Storage class for Harbor PVCs (vSphere CSI/NFS) and S3-compatible bucket for backups.
 - Jenkins controller with Docker/Podman + Cosign CLI available.
 
@@ -17,18 +17,18 @@ Use this runbook to deploy Harbor and enforce image supply chain controls across
 2. Deploy with HA values (customize `platform/harbor/values-ha.yaml` or a local copy): `helm upgrade --install harbor harbor/harbor -n platform-services -f platform/harbor/values-ha.yaml`.
 3. Validate:
    - `kubectl -n platform-services get pods -w` until all controllers are Ready.
-   - `curl -Ik https://harbor.registry.example.com/healthz` returns `200`.
+   - `curl -Ik https://registry.tcbbank.co.tz/healthz` returns `200`.
 4. Backups:
    - Mount `/backup` for the harbor-core/registry pods or run the jobsidecar with `platform/harbor/scripts/backup.sh`.
    - Create Velero schedule: `velero create schedule harbor-nightly --schedule "0 2 * * *" --include-namespaces platform-services --ttl 168h`.
 5. Restore test (quarterly):
    - Restore namespace and PVC snapshots in isolated cluster.
-   - Import DB dump and registry tarball; validate logins and pull signed image `harbor.registry.example.com/prod/hello:latest`.
+   - Import DB dump and registry tarball; validate logins and pull signed image `registry.tcbbank.co.tz/prod/hello:latest`.
 
 ## I1 — Create projects per environment/team
 1. Create `dev`, `uat`, `prod` projects (and team projects as required) via UI or API:
    ```bash
-   curl -u admin:$HARBOR_ADMIN_PASSWORD -X POST https://harbor.registry.example.com/api/v2.0/projects \
+   curl -u admin:$HARBOR_ADMIN_PASSWORD -X POST https://registry.tcbbank.co.tz/api/v2.0/projects \
      -H 'Content-Type: application/json' \
      -d '{"project_name":"prod","metadata":{"enable_content_trust":"true","immutable_tag":"true","auto_scan":"true"}}'
    ```
@@ -36,13 +36,13 @@ Use this runbook to deploy Harbor and enforce image supply chain controls across
 
 ## I2 — Enable proxy cache
 1. Create proxy cache projects (`dockerhub-proxy`, `ghcr-proxy`, `quay-proxy`) via API (see `platform/harbor/README.md`).
-2. Update Jenkins base images to use proxy paths, e.g. `FROM harbor.registry.example.com/dockerhub-proxy/library/alpine:3.19`.
+2. Update Jenkins base images to use proxy paths, e.g. `FROM registry.tcbbank.co.tz/dockerhub-proxy/library/alpine:3.19`.
 3. Validate cache hit rate in Harbor UI and set alerts on upstream rate-limit responses.
 
 ## I3 — Robot accounts and credentials
 1. For each Harbor project, create a robot account scoped to CI actions only:
    ```bash
-   curl -u admin:$HARBOR_ADMIN_PASSWORD -X POST https://harbor.registry.example.com/api/v2.0/projects/1/robots \
+   curl -u admin:$HARBOR_ADMIN_PASSWORD -X POST https://registry.tcbbank.co.tz/api/v2.0/projects/1/robots \
      -H 'Content-Type: application/json' \
      -d '{"name":"jenkins","disable":false,"duration":0,"level":"project","permissions":[{"kind":"project","namespace": "prod","access":[{"resource":"repository","action":"push"},{"resource":"repository","action":"pull"},{"resource":"artifact","action":"scan"}]}]}'
    ```
@@ -61,7 +61,7 @@ Use this runbook to deploy Harbor and enforce image supply chain controls across
    ```
 3. CI signing (Jenkins): use `pipelines/Jenkinsfile.template` which signs `IMAGE_REF` after push and uploads the transparency log entry. Validate signature:
    ```bash
-   cosign verify --key k8s://configmap/cosign-public-key/key harbor.registry.example.com/prod/hello:build-123
+   cosign verify --key k8s://configmap/cosign-public-key/key registry.tcbbank.co.tz/prod/hello:build-123
    ```
 4. Smoke test admission: deploy unsigned image into `prod` namespace and expect rejection with Kyverno `verifyImages` violation.
 
