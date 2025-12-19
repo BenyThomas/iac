@@ -160,7 +160,7 @@ spec:
     disableConcurrentBuilds()
   }
   environment {
-    HARBOR_HOST = "harbor.registry.example.com"
+    HARBOR_HOST = "registry.tcbbank.co.tz"
     BASE_IMAGE = "${HARBOR_HOST}/dockerhub-proxy/library/alpine:3.19"
     COSIGN_ATTESTATION_TYPE = "https://cosign.sigstore.dev/attestation/vuln/v1"
     SCA_SEVERITY = "CRITICAL,HIGH"

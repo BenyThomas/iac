@@ -7,7 +7,7 @@ expose:
       secretName: harbor-tls
   ingress:
     hosts:
-      core: harbor.registry.example.com
+      core: registry.tcbbank.co.tz
 persistence:
   persistentVolumeClaim:
     registry:
@@ -23,12 +23,12 @@ persistence:
     trivy:
       storageClass: vsphere-block
       size: 50Gi
-externalURL: https://harbor.registry.example.com
+externalURL: https://registry.tcbbank.co.tz
 harborAdminPassword: "${HARBOR_ADMIN_PASSWORD}"
 proxy:
-  httpProxy: http://proxy.example.com:3128
-  httpsProxy: https://proxy.example.com:3128
-  noProxy: ".cluster.local,.svc"
+  httpProxy: ""
+  httpsProxy: ""
+  noProxy: ".cluster.local,.svc,.tcbbank.co.tz"
 chartmuseum:
   enabled: false
 clair:

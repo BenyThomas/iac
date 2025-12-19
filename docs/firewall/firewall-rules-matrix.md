@@ -31,8 +31,8 @@ If using direct routing:
 - Client -> Ingress VIP: TCP 80/443
 
 ## Harbor Registry (on VMs)
-- CI/Jenkins agents -> registry.<domain>: TCP 443 (push)
-- Nodes -> registry.<domain>: TCP 443 (pull)
+- CI/Jenkins agents -> registry.tcbbank.co.tz: TCP 443 (push)
+- Nodes -> registry.tcbbank.co.tz: TCP 443 (pull)
 - MGMT -> Harbor UI: TCP 443 (restrict)
 
 ## Monitoring/Logging (examples)

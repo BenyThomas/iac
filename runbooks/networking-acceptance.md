@@ -65,8 +65,8 @@ Use this runbook to validate the networking stack: CNI, default NetworkPolicies,
    ```
 4. Validate routing:
    ```bash
-   curl -I https://app.example.com
-   curl -I -k https://app.internal.example.com
+   curl -I https://demo.apps.tcbbank.co.tz
+   curl -I -k https://demo-int.apps.tcbbank.co.tz
    ```
 5. Inspect NGINX config for headers/timeouts: `kubectl -n ingress-nginx exec deploy/ingress-nginx-controller -- nginx -T | head`.
 

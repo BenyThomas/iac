@@ -4,18 +4,18 @@ Purpose: provide a resilient Kubernetes API endpoint with failover validation.
 
 ## Prerequisites
 - Network: dedicated control-plane VLAN/subnet with routable virtual IP (VIP).
-- DNS: record for the API endpoint (for example `api.cluster.local`) pointing at the VIP or load balancer.
+- DNS: record for the API endpoint (`api.tcbbank.co.tz`) pointing at the VIP or load balancer.
 - Access: ability to configure either kube-vip on control-plane nodes or HAProxy + Keepalived on a small load balancer tier.
 - Certificates: TLS serving certs include the VIP, DNS name, and individual control-plane node names.
 
 ## Option A: kube-vip on control-plane nodes
-1. Allocate VIP and update DNS A/AAAA record to point at the VIP.
+1. Allocate VIP `172.25.2.40` and update DNS A/AAAA record for `api.tcbbank.co.tz` to point at the VIP (1:1 NAT if exposed via DMZ).
 2. Install kube-vip manifest on all three control-plane nodes:
    - Enable ARP mode for L2 or BGP peers for L3 depending on the network.
    - Bind the Kubernetes API port `6443` and advertise the VIP.
    - Set leader election to use the Kubernetes API once it is available; initial bootstrap uses static pod.
 3. Validate:
-   - `curl -k https://api.cluster.local:6443/version` returns from each node.
+   - `curl -k https://api.tcbbank.co.tz:6443/version` returns from each node.
    - Temporarily stop kubelet on the elected leader and confirm VIP fails over within 5s.
    - Monitor `kube-vip` logs for successful leader transitions and no gratuitous ARP storm.
 
@@ -30,7 +30,7 @@ Purpose: provide a resilient Kubernetes API endpoint with failover validation.
    - Backend servers: all three control-plane nodes on `:6443` with `check-ssl` and `verify none` during bootstrap (enable proper CA when certificates exist).
    - Optionally pin the scheduler to reduce latency.
 4. Validate:
-   - `curl -k https://api.cluster.local:6443/version` responds through HAProxy.
+   - `curl -k https://api.tcbbank.co.tz:6443/version` responds through HAProxy.
    - Pull the primary Keepalived node network link and ensure VIP moves to secondary.
    - Take one control-plane node out of HAProxy rotation and confirm requests still succeed.
 

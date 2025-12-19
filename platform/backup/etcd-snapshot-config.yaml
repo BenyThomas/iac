@@ -6,6 +6,6 @@ etcd-snapshot-name: rke2-prod
 etcd-s3: true
 etcd-s3-bucket: platform-rke2-etcd
 etcd-s3-folder: snapshots/prod
-etcd-s3-endpoint: https://s3.example.com
+etcd-s3-endpoint: https://s3.tcbbank.co.tz
 etcd-s3-region: us-east-1
 etcd-s3-insecure: false

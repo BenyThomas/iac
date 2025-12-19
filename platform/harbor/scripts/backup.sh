@@ -22,8 +22,8 @@ pg_dump -h "$HARBOR_DB_HOST" -U "$HARBOR_DB_USER" -Fc harbor > "${RUN_DIR}/harbo
 tar -czf "${RUN_DIR}/registry-data.tgz" -C "$HARBOR_STORAGE_PATH" .
 
 # Capture project + robot metadata (avoids storing secrets, focuses on config).
-curl -sS -u admin:"${HARBOR_ADMIN_PASSWORD:-}" "https://${HARBOR_HOST:-harbor.registry.example.com}/api/v2.0/projects" > "${RUN_DIR}/projects.json" || true
-curl -sS -u admin:"${HARBOR_ADMIN_PASSWORD:-}" "https://${HARBOR_HOST:-harbor.registry.example.com}/api/v2.0/robots" > "${RUN_DIR}/robots.json" || true
+curl -sS -u admin:"${HARBOR_ADMIN_PASSWORD:-}" "https://${HARBOR_HOST:-registry.tcbbank.co.tz}/api/v2.0/projects" > "${RUN_DIR}/projects.json" || true
+curl -sS -u admin:"${HARBOR_ADMIN_PASSWORD:-}" "https://${HARBOR_HOST:-registry.tcbbank.co.tz}/api/v2.0/robots" > "${RUN_DIR}/robots.json" || true
 
 ARCHIVE="${RUN_DIR}.tgz"
 tar -czf "$ARCHIVE" -C "$BACKUP_ROOT" "$TIMESTAMP"

@@ -48,8 +48,8 @@ metadata:
   name: enterprise-pki
 spec:
   acme:
-    email: platform-pki@example.com
-    server: https://pki.example.com/acme/directory
+    email: platform-pki@tcbbank.co.tz
+    server: https://pki.tcbbank.co.tz/acme/directory
     privateKeySecretRef:
       name: enterprise-pki-acme-key
     solvers:

@@ -35,8 +35,8 @@ Recover Harbor when the primary registry is degraded or unavailable. Use alongsi
    ```
 
 ## O1.9 — Validate and re-open registry
-- Login test: `docker login harbor.registry.example.com` using an admin or robot credential.
-- Projects and tags: `curl -u admin:$HARBOR_ADMIN_PASSWORD https://harbor.registry.example.com/api/v2.0/projects` lists expected projects; spot-check a critical artifact and its signature with `cosign verify`.
+- Login test: `docker login registry.tcbbank.co.tz` using an admin or robot credential.
+- Projects and tags: `curl -u admin:$HARBOR_ADMIN_PASSWORD https://registry.tcbbank.co.tz/api/v2.0/projects` lists expected projects; spot-check a critical artifact and its signature with `cosign verify`.
 - Replication: trigger a manual execution to DR and confirm success.
 - Scans: start a vulnerability scan on a prod artifact and ensure thresholds are enforced.
 - Once validation passes, unfreeze CI pushes and re-enable ingress replicas.

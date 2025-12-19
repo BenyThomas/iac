@@ -35,14 +35,14 @@ spec:
                 matchLabels:
                   security.platform/protected: "true"
       validate:
-        message: "Only harbor.registry.example.com images are allowed in protected namespaces."
+        message: "Only registry.tcbbank.co.tz images are allowed in protected namespaces."
         foreach:
           - list: "request.object.spec.containers[]"
             pattern:
-              image: "harbor.registry.example.com/*"
+              image: "registry.tcbbank.co.tz/*"
           - list: "request.object.spec.initContainers[]"
             pattern:
-              image: "harbor.registry.example.com/*"
+              image: "registry.tcbbank.co.tz/*"
     - name: block-latest-in-prod
       match:
         any:

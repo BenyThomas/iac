@@ -31,13 +31,13 @@ spec:
                       - prod
       verifyImages:
         - imageReferences:
-            - "harbor.registry.example.com/*"
+            - "registry.tcbbank.co.tz/*"
           attestors:
             - entries:
                 - keys:
                     publicKeys: k8s://configmap/cosign-public-key/key
                     rekor:
                       url: https://rekor.sigstore.dev
-          repository: harbor.registry.example.com
+          repository: registry.tcbbank.co.tz
           required: true
           mutateDigest: true

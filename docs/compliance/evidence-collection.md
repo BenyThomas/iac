@@ -31,7 +31,7 @@ Collect and store artifacts that prove controls are enforced across RBAC, polici
 - Harbor/Trivy reports:
   ```bash
   curl -u admin:$HARBOR_ADMIN_PASSWORD \
-    https://harbor.registry.example.com/api/v2.0/projects/<proj>/repositories/<repo>/artifacts/<tag>/additions/vulnerabilities \
+    https://registry.tcbbank.co.tz/api/v2.0/projects/<proj>/repositories/<repo>/artifacts/<tag>/additions/vulnerabilities \
     -o evidence/trivy-<proj>-<repo>-<tag>-$(date +%F).json
   ```
 - Pipeline evidence: attach the latest Jenkins/CI job artifacts that show the scanning stage results and thresholds applied.
@@ -40,7 +40,7 @@ Collect and store artifacts that prove controls are enforced across RBAC, polici
 ## O2.4 — Signed-image enforcement
 - Cosign verification sample for a prod artifact:
   ```bash
-  cosign verify --key cosign.pub harbor.registry.example.com/prod/<app>:<tag>
+  cosign verify --key cosign.pub registry.tcbbank.co.tz/prod/<app>:<tag>
   ```
 - Admission proof: `kubectl get events -A | grep -i verifyImages` or Kyverno reports showing unsigned image denials.
 - Capture the Cosign public key ConfigMap and Kyverno verifyImages policy from GitOps manifests as immutable evidence.
